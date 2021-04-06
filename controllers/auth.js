@@ -122,7 +122,7 @@ passport.use(
   })
 );
 
-exports.isAuthenticated = passport.authenticate(["basic", "bearer", "local"], {
+exports.isAuthenticated = passport.authenticate(["basic", "bearer"], {
   session: false,
 });
 exports.isClientAuthenticated = passport.authenticate("client-basic", {

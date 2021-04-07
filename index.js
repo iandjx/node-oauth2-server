@@ -1,76 +1,86 @@
-// Load required packages
-var express = require("express");
-var mongoose = require("mongoose");
-var bodyParser = require("body-parser");
-var ejs = require("ejs");
-var session = require("express-session");
-var passport = require("passport");
-var userController = require("./controllers/user");
-var authController = require("./controllers/auth");
-var oauth2Controller = require("./controllers/oauth2");
-var clientController = require("./controllers/client");
+const client = require("./client");
+const cookieParser = require("cookie-parser");
+const config = require("./config");
+const db = require("./db");
+const express = require("express");
+const expressSession = require("express-session");
+const fs = require("fs");
+const https = require("https");
+const oauth2 = require("./oauth2");
+const passport = require("passport");
+const path = require("path");
+const site = require("./site");
+// const token = require("./token");
+const user = require("./user");
 
-// Connect to the beerlocker MongoDB
-mongoose.connect("mongodb://localhost:27017/oauth", {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  useCreateIndex: true,
-});
+console.log("Using MemoryStore for the data store");
+console.log("Using MemoryStore for the Session");
+const MemoryStore = expressSession.MemoryStore;
 
-// Create our Express application
-var app = express();
-
-// Set view engine to ejs
+// Express configuration
+const app = express();
 app.set("view engine", "ejs");
+app.use(cookieParser());
 
-// Use the body-parser package in our application
-app.use(express.json());
+// Session Configuration
 app.use(
-  express.urlencoded({
-    extended: true,
-  })
-);
-
-// Use express session support since OAuth2orize requires it
-app.use(
-  session({
-    secret: "Super Secret Session Key",
+  expressSession({
     saveUninitialized: true,
     resave: true,
+    secret: config.session.secret,
+    store: new MemoryStore(),
+    key: "authorization.sid",
+    cookie: { maxAge: config.session.maxAge },
   })
 );
 
-// Use the passport package in our application
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 app.use(passport.initialize());
+app.use(passport.session());
 
-// Create our Express router
-var router = express.Router();
+// Passport configuration
+require("./auth");
 
-// Create endpoint handlers for /users
-router
-  .route("/api/users")
-  .post(userController.postUsers)
-  .get(authController.isAuthenticated, userController.getUsers);
+app.get("/", site.index);
+app.get("/login", site.loginForm);
+app.post("/login", site.login);
+app.get("/logout", site.logout);
+app.get("/account", site.account);
 
-// Create endpoint handlers for /clients
-router
-  .route("/api/clients")
-  .post(authController.isAuthenticated, clientController.postClients)
-  .get(authController.isAuthenticated, clientController.getClients);
+app.get("/dialog/authorize", oauth2.authorization);
+app.post("/dialog/authorize/decision", oauth2.decision);
+app.post("/oauth/token", oauth2.token);
 
-// Create endpoint handlers for oauth2 authorize
-router
-  .route("/api/oauth2/authorize")
-  .get(authController.isAuthenticated, oauth2Controller.authorization)
-  .post(authController.isAuthenticated, oauth2Controller.decision);
+app.get("/api/userinfo", user.info);
+app.get("/api/clientinfo", client.info);
 
-// Create endpoint handlers for oauth2 token
-router
-  .route("/api/oauth2/token")
-  .post(authController.isClientAuthenticated, oauth2Controller.token);
+// static resources for stylesheets, images, javascript files
+app.use(express.static(path.join(__dirname, "public")));
 
-// Register all our routes
-app.use(router);
+app.use((err, req, res, next) => {
+  if (err) {
+    if (err.status == null) {
+      console.error("Internal unexpected error from:", err.stack);
+      res.status(500);
+      res.json(err);
+    } else {
+      res.status(err.status);
+      res.json(err);
+    }
+  } else {
+    next();
+  }
+});
 
-// Start the server
-app.listen(3000);
+// From time to time we need to clean up any expired tokens
+// in the database
+setInterval(() => {
+  db.accessTokens
+    .removeExpired()
+    .catch((err) =>
+      console.error("Error trying to remove expired tokens:", err.stack)
+    );
+}, config.db.timeToCheckExpiredTokens * 1000);
+
+app.listen(3001);

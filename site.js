@@ -24,11 +24,16 @@ exports.index = (req, res) => {
 exports.loginForm = (req, res) => {
   res.render("login");
 };
-
+const check = (req, res, next) => {
+  console.log("login");
+  console.log(req);
+  next();
+};
 /**
  * Authenticate normal login page using strategy of authenticate
  */
 exports.login = [
+  check,
   passport.authenticate("local", {
     successReturnToOrRedirect: "/",
     failureRedirect: "/login",

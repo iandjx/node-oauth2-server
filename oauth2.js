@@ -167,7 +167,7 @@ server.exchange(
 exports.authorization = [
   login.ensureLoggedIn(),
   server.authorization((clientID, redirectURI, scope, done) => {
-    console.log(clientID);
+    console.log("clientid", clientID);
     db.clients
       .findByClientId(clientID)
       .then((client) => {

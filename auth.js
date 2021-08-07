@@ -108,10 +108,12 @@ passport.use(
 
 passport.serializeUser((user, done) => {
   console.log("serioalize called");
+  console.log(user);
   done(null, user.id);
 });
 
 passport.deserializeUser((id, done) => {
+  console.log(id);
   console.log("deserialized called");
   db.users
     .find(id)

@@ -41,8 +41,13 @@ app.use(passport.session());
 
 // Passport configuration
 require("./auth");
+const check = (req, res, next) => {
+  console.log("request");
+  console.log(req);
+  next();
+};
 
-app.get("/", site.index);
+app.get("/", check, site.index);
 app.get("/login", site.loginForm);
 app.post("/login", site.login);
 app.get("/logout", site.logout);
